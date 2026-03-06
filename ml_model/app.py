@@ -6,6 +6,7 @@ from datetime import datetime, timedelta
 import pickle
 import pandas as pd
 import numpy as np
+from market_price_service import MarketPriceService
 
 try:
     from twilio.rest import Client
@@ -45,6 +46,7 @@ twilio_verify_service_sid = os.getenv("TWILIO_VERIFY_SERVICE_SID", "")
 twilio_default_country_code = os.getenv("TWILIO_DEFAULT_COUNTRY_CODE", "+91")
 
 columns = ["N", "P", "K", "temperature", "humidity", "ph", "rainfall"]
+market_price_service = MarketPriceService()
 
 
 def get_db_connection():
@@ -276,6 +278,8 @@ def login():
 def predict():
 
     data = request.json
+    farm_size = float(data.get("farm_size", 1) or 1)
+    unit = str(data.get("unit", "Acres") or "Acres")
 
     input_data = pd.DataFrame(
         [
@@ -301,9 +305,13 @@ def predict():
 
     for i in top3_idx:
         if probs[i] > 0:  # skip 0% crops
-            results.append(
-                {"crop": crops[i], "confidence": round(float(probs[i]) * 100, 2)}
+            enriched = market_price_service.enrich_prediction(
+                crop=str(crops[i]),
+                confidence=round(float(probs[i]) * 100, 2),
+                farm_size=farm_size,
+                unit=unit,
             )
+            results.append(enriched)
 
         if len(results) == 3:  # stop after 3 crops
             break

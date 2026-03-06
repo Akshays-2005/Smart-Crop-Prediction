@@ -1,3 +1,4 @@
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Sprout, MapPin, CloudSun, Wheat, TrendingUp } from "lucide-react";
@@ -49,9 +50,62 @@ const item = {
 
 const Index = () => {
   const navigate = useNavigate();
+  const [showTranslator, setShowTranslator] = useState(false);
+
+  useEffect(() => {
+    (window as any).googleTranslateElementInit = () => {
+      const googleWindow = (window as any).google;
+      if (!googleWindow?.translate?.TranslateElement) {
+        return;
+      }
+
+      const translatorRoot = document.getElementById("google_translate_element");
+      if (!translatorRoot || translatorRoot.childElementCount > 0) {
+        return;
+      }
+
+      new googleWindow.translate.TranslateElement(
+        {
+          pageLanguage: "en",
+        },
+        "google_translate_element",
+      );
+    };
+
+    const existingScript = document.getElementById("google-translate-script");
+    if (!existingScript) {
+      const script = document.createElement("script");
+      script.id = "google-translate-script";
+      script.src = "https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit";
+      script.async = true;
+      document.body.appendChild(script);
+    } else if ((window as any).google?.translate?.TranslateElement) {
+      (window as any).googleTranslateElementInit();
+    }
+  }, []);
+
+  useEffect(() => {
+    if (!showTranslator) {
+      return;
+    }
+
+    const initFn = (window as any).googleTranslateElementInit;
+    if (typeof initFn === "function") {
+      setTimeout(() => initFn(), 0);
+    }
+  }, [showTranslator]);
 
   return (
     <div className="min-h-screen bg-background">
+      <div className="fixed right-4 top-4 z-50 flex flex-col items-end gap-2">
+        <Button variant="outline" size="sm" onClick={() => setShowTranslator((previous) => !previous)}>
+          🌐 Language
+        </Button>
+        <div className={`rounded-md border bg-card p-2 shadow-card ${showTranslator ? "block" : "hidden"}`}>
+          <div id="google_translate_element" />
+        </div>
+      </div>
+
       {/* Hero */}
       <section className="relative overflow-hidden">
         <div className="absolute inset-0">

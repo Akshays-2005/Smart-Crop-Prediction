@@ -1,4 +1,5 @@
 *.pkl
 .env
+.env.example
 *.db
 __pycache__/

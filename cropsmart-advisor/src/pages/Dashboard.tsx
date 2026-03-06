@@ -213,6 +213,8 @@ const Dashboard = () => {
       humidity: Number(humidity),
       ph: Number(ph),
       rainfall: Number(rainfall),
+      farm_size: Number(farmSize),
+      unit,
     };
 
     if (Object.values(modelInput).some((value) => Number.isNaN(value))) {

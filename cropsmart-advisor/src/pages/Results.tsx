@@ -59,6 +59,14 @@ const cropCatalog = [
 type PredictionItem = {
   crop: string;
   confidence: number;
+  market_price?: number | null;
+  probable_profit?: number | null;
+  expected_revenue?: number | null;
+  expected_yield_qtl_per_acre?: number | null;
+  estimated_cost_per_acre?: number | null;
+  area_acres?: number | null;
+  price_status?: string;
+  price_message?: string;
 };
 
 const cropAssetModules = import.meta.glob("../assets/crop images/*.{png,jpg,jpeg,webp,avif}", {
@@ -138,10 +146,23 @@ const Results = () => {
       (entry) => entry.name.toLowerCase() === prediction.crop.toLowerCase(),
     );
     const displayName = matchedCrop?.name ?? prediction.crop;
+    const areaAcres = Number(prediction.area_acres ?? 1) || 1;
+    const marketPrice = prediction.market_price ?? matchedCrop?.price ?? 0;
+    const predictedInvestment = prediction.estimated_cost_per_acre != null
+      ? Number(prediction.estimated_cost_per_acre) * areaAcres
+      : matchedCrop?.investment;
+    const predictedYield = prediction.expected_yield_qtl_per_acre ?? matchedCrop?.yield;
     return {
       ...(matchedCrop ?? createFallbackCrop(prediction.crop)),
       image: getCropImageFromAssets(displayName),
       confidence: prediction.confidence,
+      price: marketPrice,
+      investment: predictedInvestment ?? 30000,
+      yield: predictedYield ?? 20,
+      probableProfit: prediction.probable_profit,
+      expectedRevenue: prediction.expected_revenue,
+      priceStatus: prediction.price_status,
+      priceMessage: prediction.price_message,
     };
   });
 
@@ -209,6 +230,9 @@ const Results = () => {
                   </span>
                 </div>
                 <p className="text-sm text-muted-foreground">₹{crop.price.toLocaleString()} / Quintal</p>
+                {crop.priceStatus && crop.priceStatus !== "ok" && (
+                  <p className="mt-1 text-xs text-warning">Market price fallback used ({crop.priceStatus})</p>
+                )}
                 <p className="mt-2 text-xs text-muted-foreground">Tap for detailed analysis →</p>
               </div>
             </motion.div>
@@ -220,8 +244,10 @@ const Results = () => {
           <h3 className="mb-6 text-lg font-bold">📊 Profit Comparison</h3>
           <div className="space-y-4">
             {cropData.map((crop) => {
-              const profit = crop.price * crop.yield - crop.investment;
-              const maxProfit = Math.max(...cropData.map(c => c.price * c.yield - c.investment));
+              const fallbackProfit = crop.price * crop.yield - crop.investment;
+              const profit = crop.probableProfit ?? fallbackProfit;
+              const maxProfit = Math.max(...cropData.map(c => c.probableProfit ?? (c.price * c.yield - c.investment)), 1);
+              const widthPct = Math.max(0, Math.min(100, (profit / maxProfit) * 100));
               return (
                 <div key={crop.name}>
                   <div className="mb-1 flex justify-between text-sm">
@@ -231,7 +257,7 @@ const Results = () => {
                   <div className="h-3 overflow-hidden rounded-full bg-muted">
                     <motion.div
                       initial={{ width: 0 }}
-                      animate={{ width: `${(profit / maxProfit) * 100}%` }}
+                      animate={{ width: `${widthPct}%` }}
                       transition={{ duration: 0.8, delay: 0.3 }}
                       className="h-full rounded-full gradient-hero"
                     />
