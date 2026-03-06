@@ -152,6 +152,7 @@ const CropDetail = () => {
                 weather: farmState?.weather ?? {},
                 farm_size: Number(farmState?.farmSize) || 1,
                 unit: farmState?.unit ?? "Acres",
+                start_date: new Date().toISOString().split("T")[0],
               }),
             });
             const data = await res.json();
@@ -165,6 +166,7 @@ const CropDetail = () => {
                   unit: farmState?.unit,
                   schedule: data.schedule,
                   source: data.source,
+                  start_date: data.start_date,
                 },
               });
             } else {

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion, AnimatePresence } from "framer-motion";
 import {
@@ -40,6 +40,7 @@ type CalendarState = {
   unit?: string;
   schedule?: DaySchedule[];
   source?: string;
+  start_date?: string;
 };
 
 /* ------------------------------------------------------------------ */
@@ -96,11 +97,24 @@ const FarmCalendar = () => {
   const [schedule, setSchedule] = useState<DaySchedule[]>(routeState.schedule ?? []);
   const [source, setSource] = useState(routeState.source ?? "");
   const [selectedDate, setSelectedDate] = useState<string | null>(null);
+  const calendarRef = useRef<HTMLDivElement>(null);
 
-  // Calendar navigation — month/year
+  // Close popover on click outside the calendar grid
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (calendarRef.current && !calendarRef.current.contains(e.target as Node)) {
+        setSelectedDate(null);
+      }
+    };
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
+
+  // Calendar navigation — start from the schedule start_date (the day the farmer chose the crop)
   const today = new Date();
-  const [viewYear, setViewYear] = useState(today.getFullYear());
-  const [viewMonth, setViewMonth] = useState(today.getMonth()); // 0‑indexed
+  const scheduleStart = routeState.start_date ? new Date(routeState.start_date + "T00:00:00") : today;
+  const [viewYear, setViewYear] = useState(scheduleStart.getFullYear());
+  const [viewMonth, setViewMonth] = useState(scheduleStart.getMonth()); // 0‑indexed
 
   // Notification state
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
@@ -322,7 +336,7 @@ const FarmCalendar = () => {
           </div>
 
           {/* Day cells */}
-          <div className="grid grid-cols-7 gap-px">
+          <div ref={calendarRef} className="grid grid-cols-7 gap-px">
             {calendarCells.map((cell, idx) => {
               if (!cell) {
                 return <div key={`empty-${idx}`} className="min-h-[90px] rounded-lg bg-muted/30" />;
@@ -337,36 +351,74 @@ const FarmCalendar = () => {
               const uniqueTypes = [...new Set((dayData?.tasks ?? []).map((t) => t.type))];
 
               return (
-                <button
-                  key={dateStr}
-                  onClick={() => setSelectedDate(isSelected ? null : dateStr)}
-                  className={`relative min-h-[110px] rounded-lg border p-2 text-left transition-all hover:bg-primary/5
-                    ${isTodayCell ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "border-transparent"}
-                    ${isSelected ? "ring-2 ring-primary shadow-card" : ""}
-                  `}
-                >
-                  <span className={`text-xs font-semibold ${isTodayCell ? "text-primary" : "text-foreground/70"}`}>
-                    {cell.getDate()}
-                  </span>
+                <div key={dateStr} className="relative">
+                  <button
+                    onClick={() => setSelectedDate(isSelected ? null : dateStr)}
+                    className={`relative w-full min-h-[110px] rounded-lg border p-2 text-left transition-all hover:bg-primary/5
+                      ${isTodayCell ? "border-primary bg-primary/5 ring-1 ring-primary/30" : "border-transparent"}
+                      ${isSelected ? "ring-2 ring-primary shadow-card" : ""}
+                    `}
+                  >
+                    <span className={`text-xs font-semibold ${isTodayCell ? "text-primary" : "text-foreground/70"}`}>
+                      {cell.getDate()}
+                    </span>
 
-                  {/* Activity dots & mini labels */}
-                  {hasTask && (
-                    <div className="mt-1 flex flex-col gap-1">
-                      {uniqueTypes.slice(0, 3).map((type) => {
-                        const meta = getMeta(type);
-                        const count = dayData!.tasks.filter((t) => t.type === type).length;
-                        return (
-                          <span key={type} className={`block truncate rounded-md px-2 py-1 text-sm font-semibold leading-normal ${meta.bg} ${meta.color}`}>
-                            {type.split(" ")[0]}{count > 1 ? ` ×${count}` : ""}
-                          </span>
-                        );
-                      })}
-                      {uniqueTypes.length > 3 && (
-                        <span className="text-xs text-muted-foreground">+{uniqueTypes.length - 3} more</span>
-                      )}
-                    </div>
-                  )}
-                </button>
+                    {/* Activity dots & mini labels */}
+                    {hasTask && (
+                      <div className="mt-1 flex flex-col gap-1">
+                        {uniqueTypes.slice(0, 3).map((type) => {
+                          const meta = getMeta(type);
+                          const count = dayData!.tasks.filter((t) => t.type === type).length;
+                          return (
+                            <span key={type} className={`block truncate rounded-md px-2 py-1 text-sm font-semibold leading-normal ${meta.bg} ${meta.color}`}>
+                              {type.split(" ")[0]}{count > 1 ? ` ×${count}` : ""}
+                            </span>
+                          );
+                        })}
+                        {uniqueTypes.length > 3 && (
+                          <span className="text-xs text-muted-foreground">+{uniqueTypes.length - 3} more</span>
+                        )}
+                      </div>
+                    )}
+                  </button>
+
+                  {/* Hover card popover on click */}
+                  <AnimatePresence>
+                    {isSelected && dayData && dayData.tasks.length > 0 && (
+                      <motion.div
+                        initial={{ opacity: 0, scale: 0.92, y: -4 }}
+                        animate={{ opacity: 1, scale: 1, y: 0 }}
+                        exit={{ opacity: 0, scale: 0.92, y: -4 }}
+                        transition={{ duration: 0.15 }}
+                        className="absolute left-1/2 z-50 mt-2 w-80 -translate-x-1/2 rounded-xl border bg-card p-4 shadow-elevated"
+                        style={{ top: "100%" }}
+                      >
+                        {/* Arrow */}
+                        <div className="absolute -top-2 left-1/2 -translate-x-1/2 border-8 border-transparent border-b-card" />
+                        <div className="mb-3 flex items-center justify-between">
+                          <span className="text-sm font-bold text-foreground">📅 {dateStr}</span>
+                          <button onClick={() => setSelectedDate(null)} className="rounded p-1 hover:bg-muted">
+                            <X className="h-4 w-4 text-muted-foreground" />
+                          </button>
+                        </div>
+                        <div className="space-y-2.5 max-h-64 overflow-y-auto">
+                          {dayData.tasks.map((task, ti) => {
+                            const meta = getMeta(task.type);
+                            return (
+                              <div key={ti} className={`flex items-start gap-3 rounded-lg p-3 ${meta.bg}/40`}>
+                                <meta.Icon className={`mt-0.5 h-5 w-5 flex-shrink-0 ${meta.color}`} />
+                                <div className="min-w-0">
+                                  <p className="text-sm font-bold leading-tight">{task.title}</p>
+                                  <p className="mt-1 text-xs leading-snug text-muted-foreground">{task.description}</p>
+                                </div>
+                              </div>
+                            );
+                          })}
+                        </div>
+                      </motion.div>
+                    )}
+                  </AnimatePresence>
+                </div>
               );
             })}
           </div>
