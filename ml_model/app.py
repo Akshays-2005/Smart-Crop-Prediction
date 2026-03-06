@@ -7,6 +7,7 @@ import pickle
 import pandas as pd
 import numpy as np
 from market_price_service import MarketPriceService
+from cultivation_service import generate_cultivation_plan
 
 try:
     from twilio.rest import Client
@@ -317,6 +318,31 @@ def predict():
             break
 
     return jsonify(results)
+
+
+@app.route("/cultivation-plan", methods=["POST"])
+def cultivation_plan():
+    """Generate a 90-day AI cultivation calendar for a chosen crop."""
+    data = request.json or {}
+    crop = str(data.get("crop", "")).strip()
+    if not crop:
+        return jsonify({"error": "crop is required"}), 400
+
+    soil_type = str(data.get("soil_type", "Loamy"))
+    weather = data.get("weather") or {}
+    farm_size = float(data.get("farm_size", 1) or 1)
+    unit = str(data.get("unit", "Acres") or "Acres")
+    start_date = data.get("start_date")  # optional, defaults to today
+
+    result = generate_cultivation_plan(
+        crop=crop,
+        soil_type=soil_type,
+        weather=weather,
+        farm_size=farm_size,
+        unit=unit,
+        start_date=start_date,
+    )
+    return jsonify(result)
 
 
 if __name__ == "__main__":

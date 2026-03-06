@@ -1,12 +1,15 @@
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft, TrendingUp, Coins, BarChart3, Lightbulb, CheckCircle } from "lucide-react";
+import { ArrowLeft, TrendingUp, Coins, BarChart3, Lightbulb, CheckCircle, CalendarDays, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 
 const CropDetail = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const { crop, farmState } = (location.state as any) || {};
+  const [generatingPlan, setGeneratingPlan] = useState(false);
 
   if (!crop) {
     return (
@@ -136,6 +139,45 @@ const CropDetail = () => {
             ))}
           </ul>
         </Card>
+
+        <Button variant="hero" className="h-14 w-full text-lg gap-2" disabled={generatingPlan} onClick={async () => {
+          setGeneratingPlan(true);
+          try {
+            const res = await fetch("http://127.0.0.1:5000/cultivation-plan", {
+              method: "POST",
+              headers: { "Content-Type": "application/json" },
+              body: JSON.stringify({
+                crop: crop.name,
+                soil_type: farmState?.soilType ?? "Loamy",
+                weather: farmState?.weather ?? {},
+                farm_size: Number(farmState?.farmSize) || 1,
+                unit: farmState?.unit ?? "Acres",
+              }),
+            });
+            const data = await res.json();
+            if (data.schedule) {
+              navigate("/calendar", {
+                state: {
+                  crop: crop.name,
+                  soil_type: farmState?.soilType,
+                  weather: farmState?.weather,
+                  farm_size: Number(farmState?.farmSize) || 1,
+                  unit: farmState?.unit,
+                  schedule: data.schedule,
+                  source: data.source,
+                },
+              });
+            } else {
+              toast.error("Failed to generate cultivation plan.");
+            }
+          } catch {
+            toast.error("Could not reach the backend.");
+          } finally {
+            setGeneratingPlan(false);
+          }
+        }}>
+          {generatingPlan ? (<><Loader2 className="h-5 w-5 animate-spin" /> Generating Calendar…</>) : (<><CalendarDays className="h-5 w-5" /> 📅 Choose This Crop &amp; View Calendar</>)}
+        </Button>
 
         <Button variant="hero" className="h-14 w-full text-lg" onClick={() => navigate("/dashboard")}>
           🔄 New Prediction

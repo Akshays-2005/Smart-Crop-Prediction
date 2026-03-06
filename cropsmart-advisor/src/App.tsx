@@ -8,6 +8,7 @@ import Auth from "./pages/Auth";
 import Dashboard from "./pages/Dashboard";
 import Results from "./pages/Results";
 import CropDetail from "./pages/CropDetail";
+import FarmCalendar from "./pages/FarmCalendar";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -24,6 +25,7 @@ const App = () => (
           <Route path="/dashboard" element={<Dashboard />} />
           <Route path="/results" element={<Results />} />
           <Route path="/crop/:name" element={<CropDetail />} />
+          <Route path="/calendar" element={<FarmCalendar />} />
           <Route path="*" element={<NotFound />} />
         </Routes>
       </BrowserRouter>

@@ -1,7 +1,9 @@
+import { useState } from "react";
 import { useLocation, useNavigate } from "react-router-dom";
 import { motion } from "framer-motion";
-import { ArrowLeft } from "lucide-react";
+import { ArrowLeft, CalendarDays, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { toast } from "sonner";
 import heroFarm from "@/assets/hero-farm.jpg";
 
 const cropCatalog = [
@@ -132,6 +134,7 @@ const createFallbackCrop = (cropName: string) => ({
 const Results = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const [choosingCrop, setChoosingCrop] = useState<string | null>(null);
   const state = (location.state as {
     soilType?: string;
     farmSize?: string;
@@ -139,6 +142,43 @@ const Results = () => {
     weather?: { temp?: number; humidity?: number; rainfall?: number };
     predictions?: PredictionItem[];
   }) || {};
+
+  const handleChooseCrop = async (cropName: string) => {
+    setChoosingCrop(cropName);
+    try {
+      const res = await fetch("http://127.0.0.1:5000/cultivation-plan", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          crop: cropName,
+          soil_type: state.soilType ?? "Loamy",
+          weather: state.weather ?? {},
+          farm_size: Number(state.farmSize) || 1,
+          unit: state.unit ?? "Acres",
+        }),
+      });
+      const data = await res.json();
+      if (data.schedule) {
+        navigate("/calendar", {
+          state: {
+            crop: cropName,
+            soil_type: state.soilType,
+            weather: state.weather,
+            farm_size: Number(state.farmSize) || 1,
+            unit: state.unit,
+            schedule: data.schedule,
+            source: data.source,
+          },
+        });
+      } else {
+        toast.error("Failed to generate cultivation plan.");
+      }
+    } catch {
+      toast.error("Could not reach the backend. Make sure the server is running.");
+    } finally {
+      setChoosingCrop(null);
+    }
+  };
 
   const predictions = state.predictions ?? [];
   const cropData = predictions.map((prediction) => {
@@ -233,7 +273,25 @@ const Results = () => {
                 {crop.priceStatus && crop.priceStatus !== "ok" && (
                   <p className="mt-1 text-xs text-warning">Market price fallback used ({crop.priceStatus})</p>
                 )}
-                <p className="mt-2 text-xs text-muted-foreground">Tap for detailed analysis →</p>
+                <div className="mt-3 flex gap-2">
+                  <Button
+                    variant="hero"
+                    size="sm"
+                    className="flex-1 gap-1.5 text-xs"
+                    disabled={choosingCrop !== null}
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleChooseCrop(crop.name);
+                    }}
+                  >
+                    {choosingCrop === crop.name ? (
+                      <><Loader2 className="h-3 w-3 animate-spin" /> Generating…</>
+                    ) : (
+                      <><CalendarDays className="h-3 w-3" /> Choose Crop</>
+                    )}
+                  </Button>
+                </div>
+                <p className="mt-2 text-xs text-muted-foreground">Tap card for detailed analysis →</p>
               </div>
             </motion.div>
           ))}
