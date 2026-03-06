@@ -133,7 +133,25 @@ const Auth = () => {
       }
 
       toast.success(`Welcome, ${payload?.farmer?.name ?? "Farmer"}!`);
-      navigate("/dashboard", { state: { farmer: payload?.farmer } });
+      localStorage.setItem("farmer", JSON.stringify(payload.farmer));
+
+      // If the farmer has an active cultivation plan, go straight to calendar
+      if (payload.active_plan) {
+        navigate("/calendar", {
+          state: {
+            crop: payload.active_plan.crop,
+            soil_type: payload.active_plan.soil_type,
+            weather: payload.active_plan.weather,
+            farm_size: payload.active_plan.farm_size,
+            unit: payload.active_plan.unit,
+            schedule: payload.active_plan.schedule,
+            source: payload.active_plan.source,
+            start_date: payload.active_plan.start_date,
+          },
+        });
+      } else {
+        navigate("/dashboard", { state: { farmer: payload?.farmer } });
+      }
     } catch (error) {
       const message = error instanceof Error ? error.message : "Unknown error";
       toast.error(message);

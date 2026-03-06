@@ -145,7 +145,10 @@ const Results = () => {
 
   const handleChooseCrop = async (cropName: string) => {
     setChoosingCrop(cropName);
+    const farmerRaw = localStorage.getItem("farmer");
+    const farmerPhone = farmerRaw ? JSON.parse(farmerRaw)?.phone ?? "" : "";
     try {
+      const now = new Date();
       const res = await fetch("http://127.0.0.1:5000/cultivation-plan", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -155,7 +158,8 @@ const Results = () => {
           weather: state.weather ?? {},
           farm_size: Number(state.farmSize) || 1,
           unit: state.unit ?? "Acres",
-          start_date: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+          start_date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+          phone: farmerPhone,
         }),
       });
       const data = await res.json();

@@ -84,6 +84,25 @@ def init_db():
         """
     )
 
+    cursor.execute(
+        """
+        CREATE TABLE IF NOT EXISTS cultivation_plans (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            phone TEXT NOT NULL,
+            crop TEXT NOT NULL,
+            soil_type TEXT,
+            weather_json TEXT,
+            farm_size REAL,
+            unit TEXT,
+            start_date TEXT NOT NULL,
+            end_date TEXT NOT NULL,
+            schedule_json TEXT NOT NULL,
+            source TEXT,
+            created_at TEXT NOT NULL
+        )
+        """
+    )
+
     connection.commit()
     connection.close()
 
@@ -271,6 +290,7 @@ def login():
         {
             "message": "Login successful",
             "farmer": dict(farmer),
+            "active_plan": _get_active_plan(phone),
         }
     )
 
@@ -342,7 +362,87 @@ def cultivation_plan():
         unit=unit,
         start_date=start_date,
     )
+
+    # Auto-persist if phone provided
+    phone = str(data.get("phone", "")).strip()
+    if phone and result.get("schedule"):
+        _save_plan(phone, crop, soil_type, weather, farm_size, unit, result)
+
     return jsonify(result)
+
+
+def _save_plan(phone, crop, soil_type, weather, farm_size, unit, result):
+    """Persist a cultivation plan for a farmer."""
+    import json as _json
+
+    schedule = result.get("schedule", [])
+    start_date = result.get("start_date", "")
+    # Compute end date from last schedule entry
+    end_date = schedule[-1]["date"] if schedule else start_date
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    # Remove any old plan for this farmer
+    cursor.execute("DELETE FROM cultivation_plans WHERE phone = ?", (phone,))
+    cursor.execute(
+        """INSERT INTO cultivation_plans
+           (phone, crop, soil_type, weather_json, farm_size, unit, start_date, end_date, schedule_json, source, created_at)
+           VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)""",
+        (
+            phone,
+            crop,
+            soil_type,
+            _json.dumps(weather),
+            farm_size,
+            unit,
+            start_date,
+            end_date,
+            _json.dumps(schedule),
+            result.get("source", ""),
+            datetime.now().isoformat(),
+        ),
+    )
+    connection.commit()
+    connection.close()
+
+
+def _get_active_plan(phone):
+    """Return the active cultivation plan for a farmer, or None."""
+    import json as _json
+
+    today = datetime.now().strftime("%Y-%m-%d")
+    connection = get_db_connection()
+    cursor = connection.cursor()
+    cursor.execute(
+        "SELECT * FROM cultivation_plans WHERE phone = ? AND end_date >= ? ORDER BY created_at DESC LIMIT 1",
+        (phone, today),
+    )
+    row = cursor.fetchone()
+    connection.close()
+    if not row:
+        return None
+    return {
+        "crop": row["crop"],
+        "soil_type": row["soil_type"],
+        "weather": _json.loads(row["weather_json"]) if row["weather_json"] else {},
+        "farm_size": row["farm_size"],
+        "unit": row["unit"],
+        "start_date": row["start_date"],
+        "end_date": row["end_date"],
+        "schedule": _json.loads(row["schedule_json"]),
+        "source": row["source"],
+    }
+
+
+@app.route("/farmer/plan", methods=["GET"])
+def get_farmer_plan():
+    """Get the active cultivation plan for a farmer by phone."""
+    phone = normalize_phone(request.args.get("phone", ""))
+    if not phone:
+        return jsonify({"error": "phone is required"}), 400
+    plan = _get_active_plan(phone)
+    if not plan:
+        return jsonify({"active_plan": None})
+    return jsonify({"active_plan": plan})
 
 
 if __name__ == "__main__":

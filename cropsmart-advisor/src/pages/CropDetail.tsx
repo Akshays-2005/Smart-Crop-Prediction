@@ -142,6 +142,9 @@ const CropDetail = () => {
 
         <Button variant="hero" className="h-14 w-full text-lg gap-2" disabled={generatingPlan} onClick={async () => {
           setGeneratingPlan(true);
+          const farmerRaw = localStorage.getItem("farmer");
+          const farmerPhone = farmerRaw ? JSON.parse(farmerRaw)?.phone ?? "" : "";
+          const now = new Date();
           try {
             const res = await fetch("http://127.0.0.1:5000/cultivation-plan", {
               method: "POST",
@@ -152,7 +155,8 @@ const CropDetail = () => {
                 weather: farmState?.weather ?? {},
                 farm_size: Number(farmState?.farmSize) || 1,
                 unit: farmState?.unit ?? "Acres",
-                start_date: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
+                start_date: `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`,
+                phone: farmerPhone,
               }),
             });
             const data = await res.json();
