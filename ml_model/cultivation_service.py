@@ -191,7 +191,7 @@ def generate_cultivation_plan(
     if weather is None:
         weather = {}
     if not start_date:
-        start_date = datetime.utcnow().strftime("%Y-%m-%d")
+        start_date = datetime.now().strftime("%Y-%m-%d")
 
     model = _configure_gemini()
 

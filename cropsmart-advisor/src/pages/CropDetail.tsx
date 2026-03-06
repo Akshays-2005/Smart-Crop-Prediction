@@ -152,7 +152,7 @@ const CropDetail = () => {
                 weather: farmState?.weather ?? {},
                 farm_size: Number(farmState?.farmSize) || 1,
                 unit: farmState?.unit ?? "Acres",
-                start_date: new Date().toISOString().split("T")[0],
+                start_date: `${new Date().getFullYear()}-${String(new Date().getMonth() + 1).padStart(2, "0")}-${String(new Date().getDate()).padStart(2, "0")}`,
               }),
             });
             const data = await res.json();
