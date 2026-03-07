@@ -59,6 +59,22 @@ const Dashboard = () => {
     return "Loamy";
   };
 
+  const estimateSoilFromLocation = (lat: number, _lon: number) => {
+    // Regional soil defaults for India based on latitude bands
+    if (lat > 25) {
+      // North India – Indo-Gangetic plains: alluvial / loamy
+      return { ph: 7.2, clay: 28, sand: 35, silt: 37, soc: 0.8 };
+    } else if (lat > 18) {
+      // Central India – black / clay-rich (Deccan)
+      return { ph: 7.5, clay: 45, sand: 20, silt: 35, soc: 0.6 };
+    } else if (lat > 12) {
+      // South-Central – red / laterite
+      return { ph: 6.2, clay: 30, sand: 45, silt: 25, soc: 0.5 };
+    }
+    // Far South – coastal / sandy
+    return { ph: 6.0, clay: 20, sand: 50, silt: 30, soc: 0.4 };
+  };
+
   const fetchSoilAndEstimateNpk = async (lat: number, lon: number) => {
     setIsFetchingSoil(true);
     try {
@@ -73,7 +89,14 @@ const Dashboard = () => {
       params.append("depth", "0-5cm");
       params.append("value", "mean");
 
-      const response = await fetch(`https://rest.isric.org/soilgrids/v2.0/properties/query?${params.toString()}`);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 8000);
+
+      const response = await fetch(
+        `https://rest.isric.org/soilgrids/v2.0/properties/query?${params.toString()}`,
+        { signal: controller.signal },
+      );
+      clearTimeout(timeoutId);
 
       if (!response.ok) {
         throw new Error(`Soil API HTTP ${response.status}`);
@@ -109,9 +132,20 @@ const Dashboard = () => {
       setSoilType((previous) => previous || inferSoilType(clay, sand, silt));
       setSoilUpdatedAt(new Date().toLocaleTimeString());
       toast.success("Soil NPK and pH auto-filled from location");
-    } catch (error) {
-      const message = error instanceof Error ? error.message : "Unknown error";
-      toast.error(`Unable to fetch soil data: ${message}`);
+    } catch {
+      // API unreachable / timed out – use regional estimates
+      const est = estimateSoilFromLocation(lat, lon);
+      const estimatedN = est.soc * 20;
+      const estimatedP = est.ph * 5 + est.silt * 0.5;
+      const estimatedK = est.clay * 1.2 + est.sand * 0.3;
+
+      setPh(String(Number(est.ph.toFixed(2))));
+      setNitrogen(String(Number(estimatedN.toFixed(2))));
+      setPhosphorus(String(Number(estimatedP.toFixed(2))));
+      setPotassium(String(Number(estimatedK.toFixed(2))));
+      setSoilType((previous) => previous || inferSoilType(est.clay, est.sand, est.silt));
+      setSoilUpdatedAt(new Date().toLocaleTimeString());
+      toast.info("Soil data estimated from your region (live API unavailable)");
     } finally {
       setIsFetchingSoil(false);
     }
