@@ -8,7 +8,7 @@ import "./index.css";
  */
 if (typeof Node !== "undefined") {
   const origRemoveChild = Node.prototype.removeChild;
-  // @ts-expect-error – intentional monkey-patch
+  
   Node.prototype.removeChild = function <T extends Node>(child: T): T {
     if (child.parentNode !== this) {
       // Google Translate moved this node; skip the removal silently
@@ -19,7 +19,7 @@ if (typeof Node !== "undefined") {
   };
 
   const origInsertBefore = Node.prototype.insertBefore;
-  // @ts-expect-error – intentional monkey-patch
+  
   Node.prototype.insertBefore = function <T extends Node>(newNode: T, refNode: Node | null): T {
     if (refNode && refNode.parentNode !== this) {
       // Reference node was reparented by Google Translate; append instead

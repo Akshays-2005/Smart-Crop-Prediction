@@ -214,23 +214,42 @@ const Results = () => {
       (entry) => entry.name.toLowerCase() === prediction.crop.toLowerCase(),
     );
     const displayName = matchedCrop?.name ?? prediction.crop;
+    const base = matchedCrop ?? createFallbackCrop(prediction.crop);
     const areaAcres = Number(prediction.area_acres ?? 1) || 1;
-    const marketPrice = prediction.market_price ?? matchedCrop?.price ?? 0;
+    const marketPrice = prediction.market_price ?? base.price ?? 0;
     const predictedInvestment = prediction.estimated_cost_per_acre != null
       ? Number(prediction.estimated_cost_per_acre) * areaAcres
-      : matchedCrop?.investment;
-    const predictedYield = prediction.expected_yield_qtl_per_acre ?? matchedCrop?.yield;
+      : base.investment;
+    const totalInvestment = predictedInvestment ?? 30000;
+    const predictedYield = prediction.expected_yield_qtl_per_acre ?? base.yield;
+
+    // Distribute investment across 4 cost components proportionally
+    const baseFert = base.fertilizer;
+    const baseSeed = base.seed;
+    const baseIrr = base.irrigation;
+    const baseLab = base.labor;
+    const baseTotal = baseFert + baseSeed + baseIrr + baseLab;
+    const ratio = baseTotal > 0 ? totalInvestment / baseTotal : 1;
+
+    const hasPriceData = prediction.price_status === "ok" && prediction.market_price != null;
+
     return {
-      ...(matchedCrop ?? createFallbackCrop(prediction.crop)),
+      ...base,
       image: getCropImageFromAssets(displayName),
       confidence: prediction.confidence,
       price: marketPrice,
-      investment: predictedInvestment ?? 30000,
+      investment: totalInvestment,
       yield: predictedYield ?? 20,
+      areaAcres,
+      fertilizer: Math.round(baseFert * ratio),
+      seed: Math.round(baseSeed * ratio),
+      irrigation: Math.round(baseIrr * ratio),
+      labor: Math.round(baseLab * ratio),
       probableProfit: prediction.probable_profit,
       expectedRevenue: prediction.expected_revenue,
       priceStatus: prediction.price_status,
       priceMessage: prediction.price_message,
+      hasPriceData,
     };
   });
 
@@ -300,9 +319,13 @@ const Results = () => {
                     {crop.confidence}%
                   </span>
                 </div>
-                <p className="text-sm text-muted-foreground">₹{crop.price.toLocaleString()} / Quintal</p>
-                {crop.priceStatus && crop.priceStatus !== "ok" && (
-                  <p className="mt-1 text-xs text-warning">Current market price not available for this crop</p>
+                <p className="text-sm text-muted-foreground">
+                  {crop.hasPriceData
+                    ? `₹${crop.price.toLocaleString()} / Quintal`
+                    : "Market price not available"}
+                </p>
+                {!crop.hasPriceData && (
+                  <p className="mt-1 text-xs text-warning">Profit & investment data unavailable without market price</p>
                 )}
                 <div className="mt-3 flex gap-2">
                   <Button
@@ -333,6 +356,17 @@ const Results = () => {
           <h3 className="mb-6 text-lg font-bold">📊 Profit Comparison</h3>
           <div className="space-y-4">
             {cropData.map((crop) => {
+              if (!crop.hasPriceData) {
+                return (
+                  <div key={crop.name}>
+                    <div className="mb-1 flex justify-between text-sm">
+                      <span className="font-medium">{crop.name}</span>
+                      <span className="text-xs text-muted-foreground">Price data unavailable</span>
+                    </div>
+                    <div className="h-3 overflow-hidden rounded-full bg-muted" />
+                  </div>
+                );
+              }
               const fallbackProfit = crop.price * crop.yield - crop.investment;
               const profit = crop.probableProfit ?? fallbackProfit;
               const maxProfit = Math.max(...cropData.map(c => c.probableProfit ?? (c.price * c.yield - c.investment)), 1);

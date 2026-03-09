@@ -43,6 +43,7 @@ const Dashboard = () => {
   const [isFetchingSoil, setIsFetchingSoil] = useState(false);
   const [weatherUpdatedAt, setWeatherUpdatedAt] = useState<string | null>(null);
   const [soilUpdatedAt, setSoilUpdatedAt] = useState<string | null>(null);
+  const [soilSource, setSoilSource] = useState<"api" | "estimated" | null>(null);
 
   const openWeatherApiKey = (import.meta.env.VITE_OPENWEATHER_API_KEY as string | undefined)?.trim() ?? "";
 
@@ -131,6 +132,7 @@ const Dashboard = () => {
       setPotassium(String(Number(estimatedK.toFixed(2))));
       setSoilType((previous) => previous || inferSoilType(clay, sand, silt));
       setSoilUpdatedAt(new Date().toLocaleTimeString());
+      setSoilSource("api");
       toast.success("Soil NPK and pH auto-filled from location");
     } catch {
       // API unreachable / timed out – use regional estimates
@@ -145,7 +147,8 @@ const Dashboard = () => {
       setPotassium(String(Number(estimatedK.toFixed(2))));
       setSoilType((previous) => previous || inferSoilType(est.clay, est.sand, est.silt));
       setSoilUpdatedAt(new Date().toLocaleTimeString());
-      toast.info("Soil data estimated from your region (live API unavailable)");
+      setSoilSource("estimated");
+      toast.info("SoilGrids API unavailable — values estimated from your region. You can edit them manually.");
     } finally {
       setIsFetchingSoil(false);
     }
@@ -374,7 +377,15 @@ const Dashboard = () => {
                     {isFetchingSoil ? "Fetching soil..." : "Refresh Soil from Location"}
                   </Button>
                   {soilUpdatedAt && (
-                    <p className="text-xs text-muted-foreground">Soil updated at: {soilUpdatedAt}</p>
+                    <p className="text-xs text-muted-foreground">
+                      Soil updated at: {soilUpdatedAt}
+                      {soilSource === "estimated" && (
+                        <span className="ml-2 rounded bg-yellow-100 px-1.5 py-0.5 text-yellow-700 font-medium">⚠ Estimated</span>
+                      )}
+                      {soilSource === "api" && (
+                        <span className="ml-2 rounded bg-green-100 px-1.5 py-0.5 text-green-700 font-medium">✓ Live</span>
+                      )}
+                    </p>
                   )}
                 </div>
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">

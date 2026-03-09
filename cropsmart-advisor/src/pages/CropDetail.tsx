@@ -19,7 +19,10 @@ const CropDetail = () => {
     );
   }
 
-  const profit = crop.price * crop.yield - crop.investment;
+  const areaAcres = crop.areaAcres ?? 1;
+  const totalYield = crop.yield * areaAcres;
+  const hasPriceData = crop.hasPriceData ?? (crop.priceStatus === "ok");
+  const profit = hasPriceData ? crop.price * totalYield - crop.investment : 0;
 
   return (
     <div className="min-h-screen bg-background pb-12">
@@ -48,11 +51,21 @@ const CropDetail = () => {
 
         {/* Market Price */}
         <Card icon={<TrendingUp className="h-5 w-5" />} title="Market Price" color="bg-weather-light text-weather">
-          <p className="text-3xl font-extrabold">₹{crop.price.toLocaleString()} <span className="text-base font-normal text-muted-foreground">/ Quintal</span></p>
-          <p className="mt-1 text-xs text-muted-foreground">Source: AGMARKNET API</p>
+          {hasPriceData ? (
+            <>
+              <p className="text-3xl font-extrabold">₹{crop.price.toLocaleString()} <span className="text-base font-normal text-muted-foreground">/ Quintal</span></p>
+              <p className="mt-1 text-xs text-muted-foreground">Source: AGMARKNET API</p>
+            </>
+          ) : (
+            <>
+              <p className="text-xl font-bold text-muted-foreground">Market price not available for this crop</p>
+              <p className="mt-1 text-xs text-muted-foreground">AGMARKNET does not have current pricing data</p>
+            </>
+          )}
         </Card>
 
-        {/* Investment */}
+        {/* Investment – only shown when market price is available */}
+        {hasPriceData && (
         <Card icon={<Coins className="h-5 w-5" />} title="Investment Estimate" color="bg-earth-light text-earth">
           <div className="grid grid-cols-2 gap-3 text-sm">
             {[
@@ -72,13 +85,15 @@ const CropDetail = () => {
             <p className="text-2xl font-extrabold text-earth">₹{crop.investment.toLocaleString()}</p>
           </div>
         </Card>
+        )}
 
-        {/* Yield & Profit */}
+        {/* Yield & Profit – only shown when market price is available */}
+        {hasPriceData && (
         <Card icon={<BarChart3 className="h-5 w-5" />} title="Expected Yield & Profit" color="bg-profit-light text-profit">
           <div className="grid grid-cols-2 gap-4 text-center">
             <div className="rounded-lg bg-background p-4">
               <p className="text-xs text-muted-foreground">Expected Yield</p>
-              <p className="text-2xl font-extrabold">{crop.yield} <span className="text-sm font-normal">Quintals</span></p>
+              <p className="text-2xl font-extrabold">{totalYield} <span className="text-sm font-normal">Quintals{areaAcres > 1 ? ` (${crop.yield}/acre)` : ""}</span></p>
             </div>
             <div className="rounded-lg bg-primary/10 p-4">
               <p className="text-xs text-muted-foreground">Expected Profit</p>
@@ -96,19 +111,20 @@ const CropDetail = () => {
             <div className="flex h-6 overflow-hidden rounded-full">
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${(crop.investment / (crop.price * crop.yield)) * 100}%` }}
+                animate={{ width: `${(crop.investment / (crop.price * totalYield)) * 100}%` }}
                 transition={{ duration: 0.8 }}
                 className="gradient-earth"
               />
               <motion.div
                 initial={{ width: 0 }}
-                animate={{ width: `${(profit / (crop.price * crop.yield)) * 100}%` }}
+                animate={{ width: `${(profit / (crop.price * totalYield)) * 100}%` }}
                 transition={{ duration: 0.8, delay: 0.3 }}
                 className="gradient-hero"
               />
             </div>
           </div>
         </Card>
+        )}
 
         {/* AI Reasoning */}
         <Card icon={<Lightbulb className="h-5 w-5" />} title={`Why ${crop.name}?`} color="bg-warning/10 text-warning">
